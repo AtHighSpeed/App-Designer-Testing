@@ -1,4 +1,4 @@
-classdef app1 < matlab.apps.AppBase
+classdef app2 < matlab.apps.AppBase
 
     % Properties that correspond to app components
     properties (Access = public)
@@ -11,28 +11,35 @@ classdef app1 < matlab.apps.AppBase
         SendButton                matlab.ui.control.Button
         SerialPortDropDownLabel   matlab.ui.control.Label
         SerialPortDropDown        matlab.ui.control.DropDown
+        TextAreaLabel             matlab.ui.control.Label
+        TextArea                  matlab.ui.control.TextArea
     end
 
     
     % Variable initialization
     properties (Access = public)
+        iTextBox = 0; % Cell array size of TextArea
         i_sum = 0; % Variable that stores the sum value
         sumTrigger = 0; % Trigger variable for stoping the sum
         ArduinoMess = ''; % String variable that stores the message to Arduino IDO
         serialVar; % Variable for serial port communication
-        sendTrigger = 0; % % Trigger variable for sending the message
+        sendTrigger = 0; % Trigger variable for sending the message
+        time; % Datetime variable
+    end
+    
+    events
+        SendButtonIsPressed
     end
     
     methods (Access = private)
         
+        % Function that makes continuous sum when StratButton is pressed
         function [summer, trigger] = StartButtonCounter(app)
             summer = 0;
             while get(app.StartButton,'Value') == 1
                 summer = summer + 1;
                 drawnow;
-                if app.sendTrigger == 1 
-                    MessageSender(app);
-                end
+                ev = addlistener(app,'SendButtonIsPressed',@MessageSender);
             end
             if get(app.StartButton,'Value') == 0
                 trigger = 1;
@@ -41,6 +48,10 @@ classdef app1 < matlab.apps.AppBase
         end
         
         function MessageSender(app)
+            app.ArduinoMess = app.TexttosendEditField.Value;
+            app.ArduinoMess = strcat(app.ArduinoMess, '\n');
+            app.TexttosendEditField.Value = '';
+            drawnow;
             fopen(app.serialVar);
             fprintf(app.serialVar,'%s',app.ArduinoMess);
             fclose(app.serialVar);
@@ -57,6 +68,7 @@ classdef app1 < matlab.apps.AppBase
         % Value changed function: StartButton
         function StartButtonPushed(app, event)
             app.serialVar = serial(app.SerialPortDropDown.Value);
+            app.serialVar.ReadAsyncMode = 'continuous';
             if app.StartButton.Value == 1
                 app.sumTrigger = app.StartButton.Value;
                 app.StartButton.Text = 'Stop';
@@ -64,6 +76,9 @@ classdef app1 < matlab.apps.AppBase
                 app.TexttosendEditFieldLabel.Enable = 'on';
                 app.TexttosendEditField.Editable = 'on';
                 app.TexttosendEditField.Enable = 'on';
+                app.time = string(datetime('now','Format','yyyy-MM-dd HH:mm:ss.ms'));
+                app.iTextBox = app.iTextBox + 1;
+                app.TextArea.Value(app.iTextBox) = {' >> Adder started'};
                 drawnow;
                 [app.i_sum, app.sumTrigger] = StartButtonCounter(app);
             end
@@ -73,7 +88,9 @@ classdef app1 < matlab.apps.AppBase
                 app.TexttosendEditField.Editable = 'off';
                 app.TexttosendEditField.Enable = 'off';
                 app.SumEditField.Value = app.i_sum;
-
+                app.time = string(datetime('now','Format','yyyy-MM-dd HH:mm:ss.ms'));
+                app.iTextBox = app.iTextBox + 1;
+                app.TextArea.Value(app.iTextBox) = {' >> Adder stoped'};
                 drawnow;
                 app.i_sum = 0;
                 app.sumTrigger = 0;
@@ -82,11 +99,8 @@ classdef app1 < matlab.apps.AppBase
 
         % Button pushed function: SendButton
         function SendButtonPushed(app, event)
-            app.ArduinoMess = app.TexttosendEditField.Value;
-            app.ArduinoMess = strcat(app.ArduinoMess, '\n');
-            app.TexttosendEditField.Value = '';
-            drawnow;
-            app.sendTrigger = 1;
+            notify(app,'SendButtonIsPressed');
+            MessageSender(app);
         end
     end
 
@@ -151,6 +165,18 @@ classdef app1 < matlab.apps.AppBase
             app.SerialPortDropDown.Position = [103 362 100 22];
             app.SerialPortDropDown.Value = 'COM1';
 
+            % Create TextAreaLabel
+            app.TextAreaLabel = uilabel(app.UIFigure);
+            app.TextAreaLabel.HorizontalAlignment = 'right';
+            app.TextAreaLabel.Position = [26 341 56 22];
+            app.TextAreaLabel.Text = 'Text Area';
+
+            % Create TextArea
+            app.TextArea = uitextarea(app.UIFigure);
+            app.TextArea.Editable = 'off';
+            app.TextArea.FontName = 'Courier';
+            app.TextArea.Position = [26 22 582 320];
+
             % Show the figure after all components are created
             app.UIFigure.Visible = 'on';
         end
@@ -160,7 +186,7 @@ classdef app1 < matlab.apps.AppBase
     methods (Access = public)
 
         % Construct app
-        function app = app1
+        function app = app2
 
             % Create UIFigure and components
             createComponents(app)
